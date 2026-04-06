@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>心念咖啡 | 穩定修復版</title>
+    <style>
+        body { background: #f4f1de; font-family: sans-serif; margin: 0; padding: 20px; }
+        .nav { background: white; padding: 15px; border-bottom: 2px solid #d4a373; display: flex; justify-content: space-between; }
+        .card-wrap { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 20px; }
+        .card { background: white; border: 1px solid #ccc; padding: 15px; width: 150px; text-align: center; border-radius: 8px; }
+        .btn { background: #d4a373; color: white; border: none; padding: 8px 12px; cursor: pointer; border-radius: 4px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 999; }
+        .modal-box { background: white; padding: 20px; width: 300px; text-align: center; border-radius: 10px; }
+        input { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+<div class="nav">
+    <b>MINDFUL COFFEE</b>
+    <div id="auth-area">
+        <button class="btn" onclick="openLogin()">登入 / 註冊</button>
+    </div>
+</div>
+
+<div style="text-align:center; padding: 20px;">
+    <h2 id="hello-text">歡迎光臨</h2>
+    <p id="role-text">身分：訪客 (登入後可購買)</p>
+</div>
+
+<div class="card-wrap" id="menu"></div>
+
+<div id="login-pop" class="modal">
+    <div class="modal-box">
+        <h3 id="pop-title">會員登入</h3>
+        <input type="text" id="u" placeholder="帳號">
+        <input type="password" id="p" placeholder="密碼">
+        <button class="btn" style="width:100%" onclick="goAuth()">確認送出</button>
+        <p style="font-size:12px; color:blue; cursor:pointer;" onclick="changeMode()" id="mode-btn">切換到註冊</p>
+        <p style="font-size:12px; color:gray; cursor:pointer;" onclick="closeLogin()">取消</p>
+    </div>
+</div>
+
+<div id="admin-pop" class="modal">
+    <div class="modal-box" style="width: 80%; max-width: 500px;">
+        <h3>員工後台 - 訂單紀錄</h3>
+        <div style="max-height: 300px; overflow-y: auto;">
+            <table>
+                <thead><tr><th>時間</th><th>顧客</th><th>品項</th><th>金額</th></tr></thead>
+                <tbody id="order-list"></tbody>
+            </table>
+        </div>
+        <button class="btn" style="margin-top:10px;" onclick="closeAdmin()">關閉</button>
+    </div>
+</div>
+
+<script>
+    var currentRole = "GUEST";
+    var currentName = "";
+    var isLoginMode = true;
+    var products = [
+        {name: "拿鐵", price: 100}, {name: "美式", price: 80}, {name: "手沖", price: 150}
+    ];
+
+    // 1. 畫出商品
+    function drawMenu() {
+        var html = "";
+        for (var i = 0; i < products.length; i++) {
+            var item = products[i];
+            var p = (currentRole === "MEMBER") ? Math.round(item.price * 0.9) : item.price;
+            html += '<div class="card">' +
+                    '<h4>' + item.name + '</h4>' +
+                    '<p style="color:red;">$' + p + '</p>' +
+                    '<button class="btn" ' + (currentRole === "STAFF" ? "disabled" : "") + 
+                    ' onclick="buy(\'' + item.name + '\',' + p + ')">' + 
+                    (currentRole === "STAFF" ? "管理中" : "購買") + '</button>' +
+                    '</div>';
+        }
+        document.getElementById("menu").innerHTML = html;
+    }
+
+    // 2. 登入邏輯 (員工帳號: test / 12345)
+    function openLogin() { document.getElementById("login-pop").style.display = "flex"; }
+    function closeLogin() { document.getElementById("login-pop").style.display = "none"; }
+    function changeMode() {
+        isLoginMode = !isLoginMode;
+        document.getElementById("pop-title").innerText = isLoginMode ? "會員登入" : "註冊帳號";
+        document.getElementById("mode-btn").innerText = isLoginMode ? "切換到註冊" : "切換到登入";
+    }
+
+    function goAuth() {
+        var user = document.getElementById("u").value;
+        var pass = document.getElementById("p").value;
+        if (!user || !pass) return alert("請輸入完整帳密");
+
+        if (isLoginMode) {
+            if (user === "test" && pass === "12345") {
+                currentRole = "STAFF"; currentName = "員工(" + user + ")";
+                alert("員工登入成功！");
+            } else if (localStorage.getItem("coffee_user_" + user) === pass) {
+                currentRole = "MEMBER"; currentName = user;
+                alert("登入成功！享 9 折優惠");
+            } else {
+                return alert("帳密錯誤");
+            }
+            showUI();
+            closeLogin();
+        } else {
+            localStorage.setItem("coffee_user_" + user, pass);
+            alert("註冊成功，請登入");
+            changeMode();
+        }
+    }
+
+    function showUI() {
+        document.getElementById("hello-text").innerText = "您好，" + currentName;
+        document.getElementById("role-text").innerText = "身分：" + (currentRole === "STAFF" ? "員工" : "會員");
+        var area = document.getElementById("auth-area");
+        var btnHtml = '<span>' + currentName + '</span>';
+        if (currentRole === "STAFF") {
+            btnHtml += ' <button class="btn" onclick="openAdmin()">看訂單</button>';
+        }
+        btnHtml += ' <button class="btn" onclick="location.reload()" style="background:gray;">登出</button>';
+        area.innerHTML = btnHtml;
+        drawMenu();
+    }
+
+    // 3. 購買功能
+    function buy(name, price) {
+        if (currentRole === "GUEST") return alert("請先登入會員");
+        var order = {
+            time: new Date().toLocaleTimeString(),
+            user: currentName,
+            name: name,
+            price: price
+        };
+        var list = JSON.parse(localStorage.getItem("coffee_orders") || "[]");
+        list.push(order);
+        localStorage.setItem("coffee_orders", JSON.stringify(list));
+        alert("下單成功！");
+    }
+
+    // 4. 後台功能
+    function openAdmin() {
+        var list = JSON.parse(localStorage.getItem("coffee_orders") || "[]");
+        var html = "";
+        for (var i = 0; i < list.length; i++) {
+            html += "<tr><td>" + list[i].time + "</td><td>" + list[i].user + "</td><td>" + list[i].name + "</td><td>$" + list[i].price + "</td></tr>";
+        }
+        document.getElementById("order-list").innerHTML = html || "<tr><td colspan='4'>尚無訂單</td></tr>";
+        document.getElementById("admin-pop").style.display = "flex";
+    }
+    function closeAdmin() { document.getElementById("admin-pop").style.display = "none"; }
+
+    drawMenu();
+</script>
+
+</body>
+</html>
